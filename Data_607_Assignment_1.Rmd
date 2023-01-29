@@ -1,0 +1,96 @@
+---
+title: "DATA 607 Assignment 1"
+author: "Gregg Maloy"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+
+```{r load packages, include=FALSE}
+library(dplyr)
+library(readr)
+```
+
+```{r load data, include=FALSE}
+#load data
+nonvoters_data<- read_csv("https://raw.githubusercontent.com/goygoyummm/Data606_R/main/nonvoters_data.txt")  
+```
+### Part 1 - Introduction
+The article 'Why Many Americans Don't Vote' describes a survey and subsequent analysis which sought to to provide insights on voter history. The survey captured the responses of 8,327 unique individuals on questions which range from demographic information to questions on elections and political perceptions. The survey results were then matched to a second dataset providing information on respondent voting history.  The final dataset provided by fivethirtyeight.com contained survey and voting history information for 5,836 individuals. The article can be found here: https://projects.fivethirtyeight.com/non-voters-poll-2020-election/
+
+For this assignment I created a subset of three variables in hopes of providing insight to the belief that systematic racism is a problem in the United States and history of voting.
+
+
+
+
+### Part 2 - Variable Description
+1.  Q3_1 - Do you agree with the following statement "Systemic racism is problem in the United
+States"?  
+
+   *Available responses:*1=Strongly Agree,2=Somewhat Agree,3=Somewhat disagree,4=Strongly disagree  
+
+2. 'voter_category' (A history of voting in recent elections)  
+
+   *Available responses:*Always, Sporadic, Rarely/Never
+
+3. RespId  - A unique identification number which represents one unique survey respondent
+
+**'Voter_category' Response Definitions**  
+
+1.   Always       = voted in all or all but one of the national elections presidential and
+                    midterm they were eligible to vote in since 2000    
+              
+2.   Sporadic     = voted in at least two elections, but fewer than all the elections they
+                    were eligible to vote in or all but one  
+   
+3.   Rarely/Never = voted in no elections, or only one.
+
+### Part 3 - Cleaning data and making new dataframe
+
+```{r}
+#Constructing new dataframe and recoding variables
+#Make a new variable from the 'Q3_1' and recode the numerical responses via a case statement to make the data more readable
+
+nonvoters_data <- nonvoters_data%>% 
+  mutate(Systemic_racism_is_problem_in_the_United_States = case_when(
+    Q3_1 == 1 ~ '1.Strongly Agree',
+    Q3_1 == 2 ~ '2.Somewhat Agree',
+    Q3_1 == 3 ~ '3.Somewhat Disagree',
+    Q3_1 == 4 ~ '4.Strongly Disagree',
+))
+
+#renaming column name
+nonvoters_data <- nonvoters_data%>%
+  rename(
+    Respondant_Identification_Number=RespId,
+    )
+
+
+#create a new datafrom 
+d_frame <- nonvoters_data%>%
+  select(Respondant_Identification_Number, Systemic_racism_is_problem_in_the_United_States,voter_category)
+
+
+
+#exclude rows with missing values from the dataframe
+#this is the final dataframe for the assignment
+d_frame <- d_frame%>%   
+    filter(Systemic_racism_is_problem_in_the_United_States!="-1")
+
+
+
+```
+
+### Part 4 - Pivot table
+I placed the data into a pivot table to allow for high level overview
+
+```{r}
+Observed_Values<-table(d_frame$Systemic_racism_is_problem_in_the_United_States, d_frame$voter_category)
+Observed_Values
+``` 
+
+### Part 5 - Conclusion
+Further analysis would be needed to determine if there is a relationship between the answer to question "Systemic_racism_is_problem_in_the_United_States" and voter history.  It is interesting to note that among those respondents who strongly agree with the statement, these respondents are more likely to have a sporadic voting history.  I would consider using a chi-squared test to determine a relationship between these two variables.
+
