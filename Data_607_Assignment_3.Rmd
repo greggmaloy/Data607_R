@@ -1,0 +1,187 @@
+---
+title: "DATA 607 Assignment 3"
+author: "Gregg Maloy"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+
+```{r load packages, include=FALSE}
+library(dplyr)
+library(readr)
+library(data.table)
+library("stringr")
+library(tidyverse)
+```
+### Introduction    
+The objective of this assignment is to use regular expressions to manipulate and    
+analyze strings in R, as well as to become familiar with functions/packages utilized   
+in string manipulation.
+
+
+
+\newpage
+### Question 1
+Using the 173 majors listed in fivethirtyeight.com’s College Majors dataset [https://fivethirtyeight.com/features/the-economic-guide-to-picking-a-college-major/], provide code that identifies the majors that contain either "DATA" or "STATISTICS" 
+
+### Answer:  
+There are three majors which include the words 'Data' or 'Statistics'.
+To find these three majors I first loaded the data from github and then use 'filter' to obtain desired results.
+```{r load data} 
+Majors<- read_csv("https://raw.githubusercontent.com/fivethirtyeight/data/master/college-majors/majors-list.csv", show_col_types = FALSE) 
+```
+
+```{r}
+Majors_like_data_or_stats <- filter(Majors, Major %like% "STATISTICS" | Major %like% "DATA") 
+Majors_like_data_or_stats
+```
+\newpage
+### Question 2 
+Write code that transforms the data below:  
+
+[1] "bell pepper"  "bilberry"     "blackberry"   "blood orange" 
+
+[5] "blueberry"    "cantaloupe"   "chili pepper" "cloudberry"   
+
+[9] "elderberry"   "lime"         "lychee"       "mulberry"  
+
+[13] "olive"        "salal berry"
+
+
+
+Into a format like this:
+
+answer <-c("bell pepper", "bilberry", "blackberry", "blood orange", "blueberry", "cantaloupe", "chili
+pepper", "cloudberry", "elderberry", "lime", "lychee", "mulberry", "olive", "salal berry")
+dput(answer)
+
+
+### Answer
+```{r}
+#removing the '\'
+df_fruit2 <-grep("\\[\\d+", invert = TRUE, value = TRUE, scan(text = 
+'[1] "bell pepper"  "bilberry"     "blackberry"   "blood orange"
+[5] "blueberry"    "cantaloupe"   "chili pepper" "cloudberry"  
+[9] "elderberry"   "lime"         "lychee"       "mulberry"    
+[13] "olive"        "salal berry"' , what = ""))
+
+#removing the spaces
+updated_string <- gsub("", "", df_fruit2)
+dput(updated_string)
+```
+\newpage
+### Question 3 
+Describe, in words, what these expressions will match:
+Please note pattern1 '(.)\1\1' and pattern3 '(..)\1' did not return 
+anything so i modified the expression by including an additional '\' 
+where appropriate.
+```{r}
+#patterns 
+pattern1 <- "(.)\\1\\1"
+pattern2 <- "(.)(.)\\2\\1"
+pattern3 <- "(..)\\1"
+pattern4 <- "(.).\\1.\\1"
+pattern5 <- "(.)(.)(.).*\\3\\2\\1"
+
+#data to search for patterns
+character<-c('lll','he','m','nnn','123','10101','1239321','pep1pep','pepper','lll','lll')
+```
+      
+**Answer 3a**    
+(.)\1\1       
+Defines a group (.).    
+Matches any single character and the repeats a character twice(\1\1).     
+The end result will be same character repeated three instances, ie XXX
+```{r}
+character %>% 
+  str_subset(pattern1)
+```
+**Answer #3b**      
+"(.)(.)\\2\\1"       
+Defines two groups fo any characters (.)(.)      
+Refers to a pair of two characters except the second pair is in reverse order.       
+The end result will be the original two characters followed by the original two characters is reverse order,  ie eppe.
+```{r}
+character %>% 
+  str_subset(pattern2)
+```
+**Answer #3c**     
+(..)\1        
+Defines a group of two characters (..).     
+Repeats a the group of in the original order '\1', ie olol.
+```{r}
+character %>% 
+  str_subset(pattern3)
+```
+\newpage
+**Answer #3d**       
+"(.).\\1.\\1"     
+Defines a group of any character (.).        
+Followed by a random character '.'       
+Followed by the original character'\\1'        
+Followed by a random character '.'       
+Followed by the original character'\\1' 
+```{r}
+character %>% 
+  str_subset(pattern4)
+```
+**Answer #3e**   
+"(.)(.)(.).*\\3\\2\\1"     
+Defines a group of two characters (..).       
+Followed by zero or more characters of any kind '*'.        
+Followed by the same three characters in reverse order '\\3\\2\\1'.
+```{r}
+character %>% 
+  str_subset(pattern5)
+```
+\newpage
+### QUESTION 4
+Construct regular expressions to match words that:    
+
+**Answer #4a**       
+Start and end with the same character.
+```{r}
+#data to search for patterns
+characterfinal<-data.frame('kedccdck', 'aaaa', 'abbb', 'ZuZ','abba',     
+                           'pep','pepe','1212','church','eleven')
+
+pattern6 <- "^k.+k$|^a.+a$|^b.+b$|^c.+c$|^d.+d$|^e.+e$|^f.+f$|^g.+g$|^h.+h$
+|^i.+i$|^j.+j$|^k.+k$|^l.+l$|^m.+m$|^n.+n$|^o.+o$|^p.+p$|^q.+q$|^r.+r$|^s.+s$
+|^t.+t$|^u.+u$|^v.+v$|^w.+w$|^x.+x$|^y.+y$|^z.+z$"
+
+characterfinal %>% 
+  str_subset(pattern6)
+
+
+
+``` 
+     
+         
+**Answer #4b**     
+Contain a repeated pair of letters (e.g. "church" contains "ch" repeated twice.)
+```{r}
+pattern7 <- "([A-Za-z][A-Za-z]).*\\1"
+
+characterfinal %>% 
+  str_subset(pattern7)
+
+
+
+```
+       
+                 
+**Answer #4c**      
+Contain one letter repeated in at least three places (e.g. "eleven" contains three "e"s.)
+```{r}
+pattern8 <- "([A-Za-z]).*\\1.*\\1"
+
+characterfinal %>% 
+  str_subset(pattern8)
+```
+\newpage
+### Conclusion    
+String manipulation utilizing regular expression is a powerful tool.       
+When applied correctly, regular expressions can streamline code, be used in a    
+variety of different languages, ie r, python, and have a large number of use cases.
