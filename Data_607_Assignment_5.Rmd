@@ -1,0 +1,190 @@
+---
+title: "DATA 607 Project 1"
+author: "Gregg Maloy"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r load packages, include=FALSE}
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(tidyr)
+library(readr)
+library("ggplot2")
+```
+### Introduction
+The purpose of this assignment was tidy and transform data using the tidyr and dplyr packages.  For the assignment, an untidy CSV was created and loaded into R. 
+
+### Part 1: Load File and Inspection
+Below the untidy CSV was loaded into R via the read_csv command and placed into a 
+dataframe. There were numerous data quality issues which needed to be addressed before any
+analysis could be conducted.  Some of these issues included: a row which consisted of
+entirely NA values, cells with missing values, inappropriate column names, etc.
+```{r load data}
+Airline_Arrivals<- suppressMessages(read_csv     
+                      ("https://raw.githubusercontent.com/goygoyummm/Data607_R/main/20230223_Data_607_Assignment_5.csv", show_col_types = FALSE)) 
+
+DF <- data.table(Airline_Arrivals)
+DF
+```
+\newpage
+### Part 2: Tidying the data
+The following changes were made to tidy the data.  
+1. Columns names were renamed where appropriate.    
+2. Rows which did not contain any values were deleted.    
+3. Cells which contained missing values were populated with appropriate values.    
+4. A new variable was created from multiple variables to make the data more manageable   
+and appropriate for analysis.  The variable 'Destination' replaced the variables 'Los     
+Angelos','Phoenix','San Diego','San Francisco','Seattle'.    
+5. The value 'on time' within the 'Arrival_Ontime_or_Delayed' variable was changed to    
+'ontime' in order to delete a space.    
+6. In a new dataframe, two new variables, 'ontime' and 'delayed', were created from the 
+values within the 'Arrival_Ontime_or_Delayed' variable. 
+```{r}
+#rename columns
+colnames(Airline_Arrivals)[1] ="Airline"
+colnames(Airline_Arrivals)[2] ="Arrival_Ontime_or_Delayed"
+
+#remove rows with all 'na' values
+Airline_Arrivals <-Airline_Arrivals %>%
+    filter_all(any_vars(!is.na(.)))
+
+#fill missing values down
+Airline_Arrivals<-Airline_Arrivals %>%
+    fill(Airline, .direction = "down")
+
+#transform to long format
+Airline_Arrivals_Long = Airline_Arrivals %>%
+  gather("Los Angelos", "Phoenix", "San Diego","San Francisco","Seattle", key =
+           Destination, value = Count_of_Arrivals) %>%
+          arrange(Airline,Arrival_Ontime_or_Delayed,desc(Count_of_Arrivals))
+
+#remove spaces in values in one column
+Airline_Arrivals_Long <-Airline_Arrivals_Long %>%
+    mutate(Arrival_Ontime_or_Delayed = str_replace(Arrival_Ontime_or_Delayed, " ", ""))
+
+#sort to make more intuitive
+Airline_Arrivals_Long<-arrange(Airline_Arrivals_Long,Airline,Arrival_Ontime_or_Delayed,
+                               desc(Count_of_Arrivals))
+
+#Tranform to wide 
+Airline_Arrivals_Wide <- Airline_Arrivals_Long %>% 
+  spread(Arrival_Ontime_or_Delayed, Count_of_Arrivals)
+
+#new column of total arrivals by airline by location
+Airline_Arrivals_Wide <- Airline_Arrivals_Wide %>% 
+rowwise() %>% 
+  mutate(Total_Arrivals = sum(c_across(delayed:ontime), na.rm = F))
+```
+\newpage
+### Part 2: Tidying the data **continued**
+The result of the 'tidying' were two datasets, one in long format and the     
+other in wide.     
+    
+Long Format
+```{r}
+DF1 <- data.table(Airline_Arrivals_Long)
+DF1
+```
+
+Wide Format
+```{r}
+DF2 <- data.table(Airline_Arrivals_Wide)
+DF2
+```
+\newpage
+### Part 3: Calculations & Analysis
+Below dplyr was utilized to perform for calculations for analysis.
+```{r}
+#All flights % of delays vs ontime 10,000 foot overview
+  
+Overview_All_Flights<- Airline_Arrivals_Long %>%
+    dplyr::summarise(
+        Airline='All_Airlines'
+        , Delayed=
+            sum(Count_of_Arrivals[Arrival_Ontime_or_Delayed == 'delayed'], na.rm=TRUE)
+        , Total_Flights=sum(Count_of_Arrivals, na.rm=TRUE)
+        , Percent_Ontime =(100-(Delayed/Total_Flights *100))
+        , Percent_Delayed =(Delayed/Total_Flights)*100)
+
+#All flights % of delays vs ontime drill down by airline
+Overview_All_flights_by_Airline<- Airline_Arrivals_Wide %>%
+    dplyr::group_by(Airline) %>% 
+    dplyr::summarise(
+                     Ontime=sum(ontime)
+                    ,Delayed=sum(delayed)
+                    ,Total_Arrivals= sum(Total_Arrivals) 
+                    ,Percent_Ontime = 100 - (sum(delayed)/sum(Total_Arrivals)*100)
+                    ,Percent_Delayed = sum(delayed)/sum(Total_Arrivals)*100)
+
+#calculate two new columns for % arrivals delayed and % arrivals ontime by airline and destination 
+Overview_All_flights_by_Airline_and_Destination<-Airline_Arrivals_Wide %>%
+    dplyr::group_by(Destination,Airline,ontime,delayed,Total_Arrivals) %>% 
+    dplyr::summarise(
+                    ,Pct_Ontime = ((ontime/Total_Arrivals)*100)
+                    ,Pct_Delayed = ((delayed/Total_Arrivals)*100))
+
+#Rounding percentages for final tables
+Overview_All_Flights<-Overview_All_Flights %>% 
+  mutate(across(c(Percent_Ontime, Percent_Delayed), ~round(., 0)))
+
+Overview_All_Flights_by_Airline<-Overview_All_flights_by_Airline %>% 
+  mutate(across(c(Percent_Ontime, Percent_Delayed), ~round(., 0)))
+
+Overview_All_Flights_by_Airline_and_Destination<-Overview_All_flights_by_Airline_and_Destination %>% 
+mutate(across(c(Pct_Ontime, Pct_Delayed), ~round(., 0)))
+```
+\newpage
+### Part 3: Analysis
+First I took a look at the total number of arrivals which were ontime regardless of 
+airline. 88% of all flights arrived on time.
+```{r}
+DT1 <- data.table(Overview_All_Flights)
+
+# Overview_All_flights
+ggplot(data=Overview_All_Flights, aes(x=Percent_Ontime , y=Airline)) +
+  geom_bar(stat="identity", color="black", fill="Gray", width=0.25) +
+  geom_text(aes(label=Percent_Ontime), vjust=-0.3, size=3.5) +
+  theme_classic()
+DT1
+```  
+\newpage
+### Part 3: Analysis Continued    
+Next I drilled down on the number of flights which were ontime, stratifying by airline.
+89% of AM West airlines arrivals were ontime, while 87% of Alaska airlines arrivals were
+ontime. Worth noting is AM West airline had ~3,000 more total arrivals than Alaska
+airline.
+```{r}
+DT2 <- data.table(Overview_All_Flights_by_Airline)
+
+ggplot(data=Overview_All_Flights_by_Airline, aes(x= Percent_Ontime, y=Airline,fill=Airline)) +
+  geom_bar(stat="identity",color="black", position=position_dodge()) +
+  #geom_bar(stat="identity", width=0.25) +
+  geom_text(aes(label=Percent_Ontime), vjust=-0.3, size=3.5) +
+  scale_fill_brewer(palette="Paired")+
+  theme_classic()
+DT2
+``` 
+\newpage
+### Part 3: Analysis Continued 
+Finally I drilled down by both airline and arrival destination.  Upon inspection of the
+results it became apparent that Alaska airlines had a higher percentage of flights arrive
+ontime for each destination.
+```{r}
+DT3 <- data.table(Overview_All_Flights_by_Airline_and_Destination)
+ggplot(data=Overview_All_Flights_by_Airline_and_Destination, 
+       aes(x= Pct_Ontime, y=reorder(Destination,+Pct_Ontime), fill=Airline))+
+       geom_bar(stat="identity", color="black",position=position_dodge(width = 0.5))+
+       geom_text(aes(label=Pct_Ontime), vjust=-0.3, position = position_dodge(0.9),
+                 size=3.5)+
+       scale_fill_brewer(palette="Paired", breaks=rev)+
+  theme(axis.text.y=element_blank()) + #remove x axis labels
+  theme_classic()   
+DT3
+```   
+### Conclusion
+Tidyr and dplyr are very convenient tools for manipulating data, as well as performing analysis.
+
