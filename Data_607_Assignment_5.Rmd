@@ -2,9 +2,9 @@
 title: "DATA 607 Project 1"
 author: "Gregg Maloy"
 output:
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
 ---
 
 ```{r load packages, include=FALSE}
@@ -80,7 +80,7 @@ rowwise() %>%
   mutate(Total_Arrivals = sum(c_across(delayed:ontime), na.rm = F))
 ```
 \newpage
-### Part 2: Tidying the data **continued**
+### Part 2: Tidying the data continued
 The result of the 'tidying' were two datasets, one in long format and the     
 other in wide.     
     
@@ -96,7 +96,7 @@ DF2 <- data.table(Airline_Arrivals_Wide)
 DF2
 ```
 \newpage
-### Part 3: Calculations & Analysis
+### Part 3: Calculations 
 Below dplyr was utilized to perform for calculations for analysis.
 ```{r}
 #All flights % of delays vs ontime 10,000 foot overview
@@ -138,7 +138,7 @@ Overview_All_Flights_by_Airline_and_Destination<-Overview_All_flights_by_Airline
 mutate(across(c(Pct_Ontime, Pct_Delayed), ~round(., 0)))
 ```
 \newpage
-### Part 3: Analysis
+### Part 4: Analysis
 First I took a look at the total number of arrivals which were ontime regardless of 
 airline. 88% of all flights arrived on time.
 ```{r}
@@ -152,7 +152,7 @@ ggplot(data=Overview_All_Flights, aes(x=Percent_Ontime , y=Airline)) +
 DT1
 ```  
 \newpage
-### Part 3: Analysis Continued    
+### Part 4: Analysis Continued   
 Next I drilled down on the number of flights which were ontime, stratifying by airline.
 89% of AM West airlines arrivals were ontime, while 87% of Alaska airlines arrivals were
 ontime. Worth noting is AM West airline had ~3,000 more total arrivals than Alaska
@@ -169,7 +169,7 @@ ggplot(data=Overview_All_Flights_by_Airline, aes(x= Percent_Ontime, y=Airline,fi
 DT2
 ``` 
 \newpage
-### Part 3: Analysis Continued 
+### Part 4: Analysis Continued 
 Finally I drilled down by both airline and arrival destination.  Upon inspection of the
 results it became apparent that Alaska airlines had a higher percentage of flights arrive
 ontime for each destination.
@@ -185,6 +185,6 @@ ggplot(data=Overview_All_Flights_by_Airline_and_Destination,
   theme_classic()   
 DT3
 ```   
-### Conclusion
+### Part 5: Conclusion
 Tidyr and dplyr are very convenient tools for manipulating data, as well as performing analysis.
 
