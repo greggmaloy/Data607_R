@@ -1,0 +1,178 @@
+---
+title: "DATA 607 Project 2: NYC Public Transportation (3 of 3)"
+author: "Gregg Maloy"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r load packages, include=FALSE}
+library(dplyr)
+library(tidyverse)
+library(data.table)
+#library(tidyr)
+library(readr)
+#library("ggplot2")
+
+```
+### Introduction
+The goal of this assignment was to practice cleaning and manipulation of datasets for downstream
+analysis work. For the assignment, an untidy CSV was obtained from the NYC.gov portal
+(https://data.ny.gov/Transportation/MTA-Daily-Ridership-Data-Beginning-2020/vxuj-8kew) and loaded
+into R. The dataset consist of NYC MTA daily ridership for time period 03/2020 - 03/2023. The
+author of the blackboard post suggested the analysis 'could show how commuter travel varies based
+on the day of the week compared to each line of transportation'.  
+
+### Part 1: Load File and Inspection
+Below the untidy CSV was loaded into R via the read.csv command and placed into a 
+dataframe. There were numerous data quality issues which needed to be addressed before any
+analysis could be conducted.  Some of these issues included: transformation of the dataset to
+long format, deleting extraneous rows, renaming variables and converting some of the variables to date format.
+```{r load data}
+PT<- read.csv("https://raw.githubusercontent.com/goygoyummm/Data607_R/main/20230302_CUNY_DATA_607_Project_2_Public_Transportation.csv")
+
+DF <- data.table(PT)
+DF
+```
+\newpage
+### Part 2: Tidying the data and calculations
+The following changes were made to tidy the data.  
+1. Dataframe transformation to long format    
+2. Utilizing a case statement to create a new variable 'Type_of_Transportation'    
+3. Formatting a variable as a date     
+4. Creating a new variable 'Day' to provide the day of the week of ridership    
+5. Creating new variables to find mean ridership for a particular day of the week     
+6. Another transformation of the dataframe to a long format
+```{r}
+#transform to long format
+DF1 = DF %>%
+   gather("Subways..Total.Estimated.Ridership", "Buses..Total.Estimated.Ridership",
+          "LIRR..Total.Estimated.Ridership","Metro.North..Total.Estimated.Ridership",
+          "Access.A.Ride..Total.Scheduled.Trips","Bridges.and.Tunnels..Total.Traffic",
+          "Staten.Island.Railway..Total.Estimated.Ridership", 
+          key =Type_of_Public_Transportation , 
+          value = Total_Estimated_Ridership )  %>%
+   gather("Subways....of.Comparable.Pre.Pandemic.Day", "Buses....of.Comparable.Pre.Pandemic.Day",
+          "LIRR....of.Comparable.Pre.Pandemic.Day",
+          "Metro.North....of.Comparable.Pre.Pandemic.Day",
+          "Access.A.Ride....of.Comparable.Pre.Pandemic.Day",
+          "Bridges.and.Tunnels....of.Comparable.Pre.Pandemic.Day",
+          "Staten.Island.Railway....of.Comparable.Pre.Pandemic.Day",
+          key =Type_of_Public_Transportation_2, 
+          value = Percent_of_Comparable_Pre_Pandemic_Day) %>%
+          filter(Date==Date)
+
+#pulling value for below case statement
+rename<-unique(DF1$Type_of_Public_Transportation)
+view(rename)
+
+#case statement to make new variable
+DF1 <- DF1%>% 
+  mutate(Type_of_Transport = case_when(
+    Type_of_Public_Transportation == 'Subways..Total.Estimated.Ridership'     ~ 'Subway',
+    Type_of_Public_Transportation == 'Buses..Total.Estimated.Ridership'       ~ 'Bus',
+    Type_of_Public_Transportation == 'LIRR..Total.Estimated.Ridership'        ~ 'LIRR',
+    Type_of_Public_Transportation == 'Metro.North..Total.Estimated.Ridership' ~ 'MNRR',
+    Type_of_Public_Transportation == 'Access.A.Ride..Total.Scheduled.Trips'   ~ 'AR',
+    Type_of_Public_Transportation == 'Bridges.and.Tunnels..Total.Traffic'     ~ 'BT',
+    Type_of_Public_Transportation == 'Staten.Island.Railway..Total.Estimated.Ridership' ~ 'SIRR'
+))
+
+DF2 <- subset(DF1, select = c(1,6,3,5))
+
+DF2[['Date']] <- as.POSIXct(DF2[['Date']],
+                                   format = "%m/%d/%Y")
+
+DF2[['Day']]<- weekdays(DF2$Date)
+
+
+
+DF3<- DF2 %>%
+  dplyr::group_by(Type_of_Transport) %>% 
+    dplyr::summarise(
+ Monday_Average_Ridership = mean(Total_Estimated_Ridership[Day=='Monday'], na.rm = TRUE) 
+,Tuesday_Average_Ridership = mean(Total_Estimated_Ridership[Day=='Tuesday'], na.rm = TRUE) 
+,Wednesday_Average_Ridership = mean(Total_Estimated_Ridership[Day=='Wednesday'], na.rm = TRUE) 
+,Thursday_Average_Ridership = mean(Total_Estimated_Ridership[Day=='Thursday'], na.rm = TRUE)
+,Friday_Average_Ridership = mean(Total_Estimated_Ridership[Day=='Friday'], na.rm = TRUE) 
+,Saturday_Average_Ridership = mean(Total_Estimated_Ridership[Day=='Saturday'], na.rm = TRUE) 
+,Sunday_Average_Ridership = mean(Total_Estimated_Ridership[Day=='Sunday'], na.rm = TRUE)) 
+
+
+DF4 = DF3 %>%
+   gather("Monday_Average_Ridership", "Tuesday_Average_Ridership",
+          "Wednesday_Average_Ridership","Thursday_Average_Ridership",
+          "Friday_Average_Ridership","Saturday_Average_Ridership",
+          "Sunday_Average_Ridership", 
+          key =Day_junk , 
+          value = Mean_Estimated_Ridership )
+
+DF4 <- DF4%>% 
+  mutate(Day = case_when(
+    Day_junk == 'Monday_Average_Ridership'       ~ 'Monday',
+    Day_junk == 'Tuesday_Average_Ridership'      ~ 'Tuesday',
+    Day_junk == 'Wednesday_Average_Ridership'    ~ 'Wednesday',
+    Day_junk == 'Thursday_Average_Ridership'     ~ 'Thursday',
+    Day_junk == 'Friday_Average_Ridership'       ~ 'Friday',
+    Day_junk == 'Saturday_Average_Ridership'     ~ 'Saturday',
+    Day_junk == 'Sunday_Average_Ridership'       ~ 'Sunday'
+))
+
+  
+DF4 <- subset(DF4, select = c(1,4,3))
+
+
+DF4$Day <- factor(DF4$Day,
+    levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+  
+
+Railroad<- DF4[which(DF4$Type_of_Transport=='LIRR'| DF4$Type_of_Transport=='MNRR'| DF4$Type_of_Transport=='SIRR'),]
+
+Subway_Bus_and_Bridge_and_Tunnels<- DF4[which(DF4$Type_of_Transport=='Bus'| DF4$Type_of_Transport=='Subway'| DF4$Type_of_Transport=='BT'),]
+
+Access_A_Ride<- DF4[which( DF4$Type_of_Transport=='AR'),]
+
+```
+\newpage
+
+
+\newpage
+### Part 3: Analysis
+Below the day of the week was plotted against mean estimated ridership for all modes of
+transportation.  Generally, rideship decreased as the week headed into the weekend, noting modest
+decreases on Friday, Saturday and Sunday for the subway, bus, and bridges and tunnels. Of note,
+Sunday is the only day of the week where mean ridership for bridges and tunnels exceeded bus
+ridership.   
+```{r}
+ggplot(DF4,                                      
+       aes(x = Day,
+           y = Mean_Estimated_Ridership,
+           fill = Type_of_Transport)) +
+  geom_bar(stat = "identity",position = "dodge")  
+```
+    
+I decided to take a closer look the commuter rails and access-a-ride modes of transport since the y-axis of the above plot obscured any relationship.  Below commuter rail and the access-a-ride  ridership are plotted separately to assess day of week ridership utilization.  The pattern previously noted, decreased weekend utilization, also extended to commuter railroad and access-a-ride modes of transport. 
+
+```{r}
+ggplot(Railroad,                                      
+       aes(x = Day,
+           y = Mean_Estimated_Ridership,
+           fill = Type_of_Transport)) +
+  geom_bar(stat = "identity",position = "dodge")  
+
+
+ggplot(Access_A_Ride,                                      
+       aes(x = Day,
+           y = Mean_Estimated_Ridership,
+           fill = Type_of_Transport)) +
+  geom_bar(stat = "identity",position = "dodge")  
+
+```
+
+
+### Part 4: Conclusion
+Tidyr and dplyr are very convenient tools for manipulating data, as well as performing analysis.
+Mean ridership for all modes of transport decreased starting Friday, hitting the lowest ridership on Sunday.  
+

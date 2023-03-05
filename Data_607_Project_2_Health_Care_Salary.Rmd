@@ -1,0 +1,156 @@
+---
+title: "DATA 607 Project 2: Mean Salary of Healthcare Workers vs Number Employed (2 of 3)"
+author: "Gregg Maloy"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r load packages, include=FALSE}
+#library(dplyr)
+library(tidyverse)
+library(data.table)
+#library(tidyr)
+library(readr)
+#library("ggplot2")
+
+```
+### Introduction
+The goal of this assignment was to practice cleaning and manipulation of datasets for downstream
+analysis work.  The dataset used in this RMD file can be found at:
+https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/Health_US/hus20-21tables/hcempl.xlsx
+. The dataset consists of employment numbers and mean salaries for healthcare workers for
+select years between 2000 and 2020.
+
+For analysis, the author of the blackboard post suggested trending each profession to determine
+if employment 'has been increasing or decreasing compared to the the change in mean salary'. 
+
+### Part 1: Load File and Inspection
+Below the untidy CSV was loaded into R via the read.csv command and placed into a 
+dataframe. There were some data quality issues which needed to be addressed before any
+analysis could be conducted.  Some of these issues included: transformation of the dataset to
+long format so the desired analysis could be conducted, deleting extraneous rows and converting
+some of the variables to numeric format.
+```{r load data}
+HC<- read.csv("https://raw.githubusercontent.com/goygoyummm/Data607_R/main/20230302_CUNY_DATA_607_Project_2_Health_Care_Salary.csv")
+
+DF<-HC
+```
+\newpage
+### Part 2: Tidying the data
+The following changes were made to tidy the data.      
+1. Renaming columns in preparation for transformation to long format    
+2. Deleting extraneous rows    
+3. Transforming to long format     
+4. Deleting extraneous columns from dataframe     
+5. Converting to numerical formate    
+
+```{r}
+#renaming columns
+colnames(DF)[1] ="Occupation_Title"
+colnames(DF)[2] ="2000"
+colnames(DF)[3] ="2005"
+colnames(DF)[4] ="2009"
+colnames(DF)[5] ="2010"
+colnames(DF)[6] ="2015"
+colnames(DF)[7] ="2016"
+colnames(DF)[8] ="2020"
+colnames(DF)[9] ="2000_Mean_Salary"
+colnames(DF)[10] ="2005_Mean_Salary"
+colnames(DF)[11] ="2009_Mean_Salary"
+colnames(DF)[12] ="2010_Mean_Salary"
+colnames(DF)[13] ="2015_Mean_Salary"
+colnames(DF)[14] ="2016_Mean_Salary"
+colnames(DF)[15] ="2020_Mean_Salary"
+
+#deleting rows
+DF<- DF  %>% filter(!row_number() %in% c(1,2,3,4,5,49,50,51))
+
+#transform to long format
+dat1 = DF %>%
+   gather("2000","2005", "2009", "2010","2015","2016","2020", key =
+           Year, value = Number_Employed ) %>%
+   gather("2000_Mean_Salary","2005_Mean_Salary", "2009_Mean_Salary", "2010_Mean_Salary"
+          , "2015_Mean_Salary", "2016_Mean_Salary", "2020_Mean_Salary"
+          , key =
+           Mean_Salary_Year, value = Mean_Salary)  %>%
+  filter(substring(Year, 1,4) ==  substring(Mean_Salary_Year,1,4)) 
+  
+#deleting the extra year column
+dat1 = subset(dat1, select = -c(Mean_Salary_Year) )
+dat2<- subset(dat1, Mean_Salary!="…" & Mean_Salary!=""&Mean_Salary!="NA")
+
+#converting to number (the comma made it impossible to convert to number)
+dat2$Number_Employed <- trimws(gsub(',','',dat2$Number_Employed,fixed=T))
+dat2$Number_Employed  <- as.numeric(dat2$Number_Employed )
+dat2[, c(2,4)] <- sapply(dat2[, c(2,4)], as.numeric)
+
+dat2 <- dat2[order(dat2$Mean_Salary,decreasing=TRUE),]
+```
+\newpage
+Below are the first 10 rows of the resulting dataframe sorted by highest mean salary.  
+'Nurse anesthetists' was the occupation which had the highest mean salary ($90.96 in 2020).
+```{r}
+head(dat2, 10)
+```
+\newpage
+### Part 3: Calculations 
+Below dplyr was utilized to perform for calculations for analysis.
+As this is a rudimentary analysis, all calculations were limited to the first and last
+years of available data, 2000 and 2020.  
+```{r}
+df2<- dat2 %>%
+  dplyr::group_by(Occupation_Title) %>% 
+    dplyr::summarise(
+ Mean_Salary[Year=='2000']     
+,Mean_Salary[Year=='2020']   
+,Salary_Change_bw_2020_2000 = Mean_Salary[Year=='2020']-Mean_Salary[Year=='2000']  
+,Percent_Salary_Change_bw_2020_2000 =
+      (Mean_Salary[Year=='2020']-Mean_Salary[Year=='2000'])/Mean_Salary[Year=='2000']*100
+,Number_Employed[Year=='2000']  
+,Number_Employed[Year=='2020']  
+,Number_Employed_Change_bw_2020_2000 =  
+      Number_Employed[Year=='2020']-Number_Employed[Year=='2000']  
+,Percent_Employed_Change_bw_2020_2000 =  
+(Number_Employed[Year=='2020']-Number_Employed[Year=='2000'])/Number_Employed[Year=='2000']*100)
+```
+Once calculated, 'Physican Assistant' was the profession which had the highest percent mean
+salary change (91%).  
+```{r}
+df2 <- df2[order(df2$Percent_Salary_Change_bw_2020_2000,decreasing=TRUE),]
+head(df2, 10)
+```
+Since the data in the above calculations was limited to 2000 and 2020, professions which were 
+missing data for 2000 or 2020 were automatically excluded from the dataframe. These professions
+include Nurse Practiners, Nurse Midwifes, etc.  These professions can be quickly viewed in the
+below graph.
+```{r}
+ggplot(data=dat2, aes(x=Year,y=Number_Employed)) +
+  geom_line()+
+  geom_point()+
+  facet_wrap(~Occupation_Title) +
+  ggtitle("Number of Employed by Occupation Title") +
+  theme(plot.title = element_text( face="bold", size=15, hjust=0, color="#555555")) +
+  theme(axis.text.x = element_text(angle=90)) 
+```
+      
+\newpage
+### Part 4: Analysis
+'Percent mean salary change between the years 2000 and 2020' was plotted against 'Percent change in employment between the years 2000 and 2020'.  This analysis was rudimentary and not necessarily complete.  The analysis could be used as justification for carrying on additional analysis to determine if a statistically significant correlation exists.  
+
+As seen from the scatterplot and regression line below, there appears to be a correlation between 'Percent mean salary change between the years 2000 and 2020' and 'Percent change in employment between the years 2000 and 2020'.
+```{r}
+#Plotting all values regardless of year
+ggplot(data=df2, aes(x=Percent_Salary_Change_bw_2020_2000, y=Percent_Employed_Change_bw_2020_2000, group=1)) +
+  geom_point(size=2, shape=23) +
+  geom_smooth(method="lm", se=TRUE, fullrange=FALSE, level=0.95)
+```  
+
+\newpage
+### Part 5: Conclusion
+Tidyr and dplyr are very convenient tools for manipulating data, as well as performing analysis.
+Although there appears to be a correlation between 'Percent mean salary change between the years
+2000 and 2020' and 'Percent change in employment between the years 2000 and 2020', more analysis
+is needed to determine if this correlation is statistically significant.
+ 
