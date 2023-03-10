@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <fantast_books>
     <book_name>
-        <title>The Talisman</title>
-        <author>KarlStephen King,Peter Straub</author>
-        <genre>Fantasy</genre>
-        <language>English</language>
-        <series>Jack Sawyer Trilogy</series>
+        <Title>The Talisman</Title>
+        <Author>Karl Stephen King,Peter Straub</Author>
+        <Genre>Fantasy</Genre>
+        <Language>English</Language>
+        <Series>Jack Sawyer Trilogy</Series>
     </book_name>
     <book_name>
-        <title>Return of the King</title>
-        <author>John Ronald Reuel Tolkien</author>
-        <genre>Fantasy</genre>
-        <language>English</language>
-        <series>Lord of the Rings</series>
+        <Title>Return of the King</Title>
+        <Author>John Ronald Reuel Tolkien</Author>
+        <Genre>Fantasy</Genre>
+        <Language>English</Language>
+        <Series>Lord of the Rings</Series>
     </book_name>
     <book_name>
-        <title>A Dance with Dragons</title>
-        <author>George R. R. Martin</author>
-        <genre>Fantasy</genre>
-        <language>English</language>
-        <series>Lord of the Rings</series>
+        <Title>A Dance with Dragons</Title>
+        <Author>George R. R. Martin</Author>
+        <Genre>Fantasy</Genre>
+        <Language>English</Language>
+        <Series>A Song of Ice and Fire</Series>
     </book_name>
 </fantast_books>
