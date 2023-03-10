@@ -2,21 +2,21 @@
 <fantast_books>
     <book_name>
         <Title>The Talisman</Title>
-        <Author>Karl Stephen King,Peter Straub</Author>
+        <Authors>Karl Stephen King,Peter Straub</Authors>
         <Genre>Fantasy</Genre>
         <Language>English</Language>
         <Series>Jack Sawyer Trilogy</Series>
     </book_name>
     <book_name>
         <Title>Return of the King</Title>
-        <Author>John Ronald Reuel Tolkien</Author>
+        <Authors>John Ronald Reuel Tolkien</Authors>
         <Genre>Fantasy</Genre>
         <Language>English</Language>
         <Series>Lord of the Rings</Series>
     </book_name>
     <book_name>
         <Title>A Dance with Dragons</Title>
-        <Author>George R. R. Martin</Author>
+        <Authors>George R. R. Martin</Authors>
         <Genre>Fantasy</Genre>
         <Language>English</Language>
         <Series>A Song of Ice and Fire</Series>
