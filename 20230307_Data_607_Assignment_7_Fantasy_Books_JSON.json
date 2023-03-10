@@ -1,5 +1,5 @@
 {"FantasyBooks":[
-    {"Title":"The Talisman","Authors":["Karl Stephen King,Peter Straub"],"Genre":"Fantasy","Language":"English","Series":"Jack Sawyer Trilogy"},
+    {"Title":"The Talisman","Authors":["Karl Stephen King, Peter Straub"],"Genre":"Fantasy","Language":"English","Series":"Jack Sawyer Trilogy"},
     {"Title":"Return of the King","Authors":"John Ronald Reuel Tolkien","Genre":"Fantasy","Language":"English","Series":"Lord of the Rings"},
     {"Title":"A Dance with Dragons","Authors":["George R. R. Martin"],"Genre":"Fantasy","Language":"English","Series":"A Song of Ice and Fire"}
     ]}
