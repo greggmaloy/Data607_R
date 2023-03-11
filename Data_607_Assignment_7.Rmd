@@ -1,0 +1,188 @@
+---
+title: "DATA 607 Assignment 7"
+author: "Gregg Maloy"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+```{r load packages, include=FALSE}
+library(dplyr)
+#library(tidyverse)
+library(data.table)
+library(tidyr)
+#library(readr)
+#library("ggplot2")
+#library(rjson)
+library(jsonlite)
+library(XML)
+library(xml2)
+#library("methods")
+#library(knitr)
+library(rvest)
+library(DT)
+
+```
+### Part 1: Introduction
+The purpose of this assignment was record attributes from three books in three different mark down languages: HTML, XML and JASN. The attributes were written into a table structure in each respective file. Finally, these files were ingest into R and displayed.
+
+Each file was written by hand using W3schools.com as a reference.       
+https://www.w3schools.com/html/html_tables.asp      
+https://www.w3schools.com/js/js_json_intro.asp     
+https://www.w3schools.com/xml/ajax_applications.asp    
+
+\newpage
+### Part 2: Writing HTML, XML and JASN Files    
+Below is the HTML Code:
+```   
+<!DOCTYPE html>
+<html>
+<style>
+table, th, td {
+  border:1px solid black;
+}
+</style>
+<body>
+
+<h2>Fantasy Books</h2>
+
+<table style="width:100%">
+  <tr>
+    <th>Title</th>
+    <th>Authors</th>
+    <th>Genre</th>
+    <th>Language</th>
+    <th>Series</th>
+  </tr>
+  <tr>
+    <td>The Talisman</td>
+    <td>Karl Stephen King, Peter Straub</td>
+    <td>Fantasy</td>
+    <td>English</td>
+    <td>Jack Sawyer Trilogy</td>
+  </tr>
+  <tr>
+    <td>Return of the King</td>
+    <td>John Ronald Reuel Tolkien</td>
+    <td>Fantasy</td>
+    <td>English</td>
+    <td>Lord of the Rings</td>
+  </tr>
+  <tr>
+    <td>A Dance with Dragons</td>
+    <td>George R. R. Martin</td>
+    <td>Fantasy</td>
+    <td>English</td>
+    <td>A Song of Ice and Fire</td>
+  </tr>
+</table>
+</body>
+</html>
+```
+\newpage
+Below is the XML Code:
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<fantast_books>
+    <book_name>
+        <Title>The Talisman</Title>
+        <Authors>Karl Stephen King,Peter Straub</Authors>
+        <Genre>Fantasy</Genre>
+        <Language>English</Language>
+        <Series>Jack Sawyer Trilogy</Series>
+    </book_name>
+    <book_name>
+        <Title>Return of the King</Title>
+        <Authors>John Ronald Reuel Tolkien</Authors>
+        <Genre>Fantasy</Genre>
+        <Language>English</Language>
+        <Series>Lord of the Rings</Series>
+    </book_name>
+    <book_name>
+        <Title>A Dance with Dragons</Title>
+        <Authors>George R. R. Martin</Authors>
+        <Genre>Fantasy</Genre>
+        <Language>English</Language>
+        <Series>A Song of Ice and Fire</Series>
+    </book_name>
+</fantast_books>
+```
+\newpage
+Finally, below is the JASN Code:
+```
+
+{"FantasyBooks":[
+    {"Title":"The Talisman","Authors":["Karl Stephen King, Peter Straub"],"Genre":"Fantasy","Language":"English","Series":"Jack Sawyer Trilogy"},
+    {"Title":"Return of the King","Authors":"John Ronald Reuel Tolkien","Genre":"Fantasy","Language":"English","Series":"Lord of the Rings"},
+    {"Title":"A Dance with Dragons","Authors":["George R. R. Martin"],"Genre":"Fantasy","Language":"English","Series":"A Song of Ice and Fire"}
+    ]}
+```
+\newpage
+### Part 3: R Ingestion     
+Below is the R code for ingestion:  
+
+JASN file
+```{r load jasn data}
+JASN_File<-"https://raw.githubusercontent.com/goygoyummm/Data607_R/main/20230307_Data_607_Assignment_7_Fantasy_Books_JSON.json"
+JASN_Table<-fromJSON(JASN_File)
+JASN_Table<-JASN_Table[['FantasyBooks']]
+JASN_Table<- data.table(JASN_Table)
+```
+XML file
+```{r load XML data}
+XML_File <- read_xml("https://raw.githubusercontent.com/goygoyummm/Data607_R/main/20230307_Data_607_Assignment_7_Fantasy_Books_eX.xml")
+XML_Table<- xmlTreeParse(XML_File, useInternal=TRUE)
+XML_Table<- xmlToDataFrame(XML_Table)
+XML_Table<- data.table(XML_Table)
+
+```
+HTML File
+```{r load HTML data}
+HTML_File <- read_html("https://raw.githubusercontent.com/goygoyummm/Data607_R/main/20230307_Data_607_Assignment_7_Fantasy_Books_Hypertext.html")
+HTML_Table <- html_table(HTML_File)[[1]]
+HTML_Table<- data.table(HTML_Table)
+
+```
+\newpage
+### Part 4: Results  
+A glimpse of each table displays one difference in how the different files were ingested into R.  In the JASN file, 'author' was formatted as a list, while the HTML and XML files 'author' was formatted as a character.
+
+```{r}
+glimpse(HTML_Table)
+glimpse(XML_Table)
+glimpse(JASN_Table)
+```
+The list formatted object 'author' was converted to character format below.
+```{r}
+JASN_Table<-unnest(JASN_Table, Authors)
+glimpse(JASN_Table)
+```
+After converting the list formate to character formate, the tables produced by each file type were identical as seen below.
+```{r}
+datatable(
+  HTML_Table, extensions = 'FixedColumns',
+  options = list(
+  dom = 't',
+  scrollX = TRUE,
+  scrollCollapse = TRUE
+))
+
+datatable(
+  XML_Table, extensions = 'FixedColumns',
+  options = list(
+  dom = 't',
+  scrollX = TRUE,
+  scrollCollapse = TRUE
+))
+
+datatable(
+  JASN_Table, extensions = 'FixedColumns',
+  options = list(
+  dom = 't',
+  scrollX = TRUE,
+  scrollCollapse = TRUE
+))
+```
+\newpage
+### Part 5: Conclusion
+All three tables are identical after converting the list formatted variable to character formatted variable.  In terms of writing and manipulating HTML, XML and JASN files, writing the tables in JASN was a little more intuitive than HTML and XML.
