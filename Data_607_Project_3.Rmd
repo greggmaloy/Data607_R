@@ -1,0 +1,342 @@
+---
+title: "DATA 607 Project 3"
+author: "Gregg Maloy"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+```{r load packages, include=FALSE}
+library(dplyr)
+library(plyr)
+library(data.table)
+library(tidyr)
+library(readr)
+library("ggplot2")
+library(tidyverse)
+library(forcats)
+```
+### Introduction
+The purpose of this assignment was to:   
+1. collaborate in teams of 5 or less,     
+2. together locate a data set which would help answer the question “Which are   
+the most valued data science skills?",     
+3. together conduct an analysis which would answer the question “Which are the   
+most valued data science skills?", and    
+4. present analysis findings in a class presentation.    
+
+For this analysis we worked on locating the data set, writing the code, developing    
+the analysis and developing the deck together.  Dataset questions were divided into   
+five categories or 'buckets', with each team member responsible for developing   
+analysis of one bucket.   
+
+Below are the 5 'data science buckets' and team members assigned to each:    
+1. Gregg Maloy - Visualizations    
+2. Jacob Silver - Storage and cloud computing    
+3. Umer Farooq - Machine learning    
+4. Jian Quan Chen - Programming/IDE    
+5. Miguel Gomez - Self Development/Soft Skills   
+
+For this assignment we used '2022 Kaggle Machine Learning & Data Science Survey'.    
+The survey includes questions on demographics, professional experience, salary,   
+title and various data science skills.
+    
+The dataset is located at:    
+https://www.kaggle.com/competitions/kaggle-survey-2022/data
+
+### Part 1: Load file, minor tidying and variable creation
+1. Ingest the file from github and convert all missing values to NA.
+2. Delete the first row of the dataset.
+3. New variable creation to limit size of discrete values for 'salary' variable.
+```{r load data}
+k<- read.csv("https://raw.githubusercontent.com/goygoyummm/Data607_R/main/20230307_Kaggel_DS_Skill_Survey1.csv", na.strings=c("","NA"))
+
+df<-k
+df<- df  %>% filter(!row_number() %in% c(1))
+df$Q29_grouped <- mapvalues(df$Q29, 
+          from=c('$0-999','1,000-1,999','2,000-2,999','3,000-3,999','4,000-4,999','5,000-7,499',
+                 '7,500-9,999','10,000-14,999','15,000-19,999','20,000-24,999','25,000-29,999',
+                 '30,000-39,999','40,000-49,999','50,000-59,999','60,000-69,999','70,000-79,999',
+                 '80,000-89,999','90,000-99,999','100,000-124,999','125,000-149,999','150,000-199,999',
+                 '200,000-249,999','250,000-299,999','300,000-499,999','$500,000-999,999','>$1,000,000'), 
+          to=c('$0-4,999','$0-4,999','$0-4,999','$0-4,999','$0-4,999','$5,000-24,999','$5,000-24,999',
+               '$5,000-24,999','$5,000-24,999','$5,000-24,999','$25,000-69,999','$25,000-69,999',
+               '$25,000-69,999','$25,000-69,999','$25,000-69,999','$70,000-$149,999','$70,000-$149,999',
+               '$70,000-$149,999','$70,000-$149,999','$70,000-$149,999','$150,000-$999,999',
+               '$150,000-$999,999','$150,000-$999,999','$150,000-$999,999','$150,000-$999,999',
+               '>$1,000,000')
+          )
+
+```
+### Part 2: Programming
+Below we created code to standardize workflow.
+All code was developed collaboratively.
+```{r}
+graph_multicolumn_q <- function(og_df, q_list, 
+                                q_name, val_label,
+                                q_text) {
+  #Create limited df with only that question's columns
+  q_df <- df %>%
+     select(all_of(q_list))
+  
+  #Create long-pivoted df for graphing
+  q_df1 <- q_df %>%
+    pivot_longer(
+    cols = everything(),
+    names_to = q_name,
+    values_to = val_label,
+    values_drop_na = TRUE)
+  
+  #Produce df of value counts
+  q_df1_count <- q_df1 %>%
+    count(!!sym(val_label))
+  
+  #Graph result
+  
+  q_df1 %>%
+    ggplot(aes(x=fct_rev(fct_infreq(!!sym(val_label)))))+
+    geom_bar()+
+    coord_flip()+
+    theme_minimal()+
+    ggtitle(q_text)+
+    xlab(val_label)
+  
+}
+```
+Below is the code for the visualization bucket which I volunteered for.
+```{r}
+#define column lists for each question
+
+
+q15_cols <-  c(  "Q15_1",	"Q15_2",	"Q15_3",	"Q15_4",	"Q15_5",	"Q15_6",	"Q15_7",	"Q15_8"
+  ,"Q15_9",	"Q15_10",	"Q15_11",	"Q15_12",	"Q15_13",	"Q15_14",	"Q15_15")
+
+
+q36_cols <-  c(   "Q36_1",	"Q36_2",	"Q36_3",	"Q36_4",	"Q36_5",	"Q36_6",	"Q36_7"
+  ,"Q36_8",	"Q36_9",	"Q36_10",	"Q36_11",	"Q36_12",	"Q36_13",	"Q36_14",	"Q36_15")
+
+
+
+```
+The code that is commented out initially worked for me, but stopped at the end of the project.
+All team members are submitting this code, so I included it commented out.
+Below is also the code I initially wrote for the analysis and which was later used as a basis for the more advanced code.
+
+```{r}
+#graph_multicolumn_q(df,
+#                    q36_cols,
+#                    'Question 36',
+#                    'App',
+#                    'BI Tools')
+
+
+df23<- df  %>% select("Q23")
+
+dfq23 <- df23 %>%
+  pivot_longer(
+    cols=everything(),
+    names_to="Question_23",
+    values_to="Title",
+    values_drop_na=TRUE
+  )
+
+dfq23 %>%
+  ggplot(aes(x=fct_rev(fct_infreq(Title))))+
+  geom_bar()+
+  coord_flip()+
+  theme_minimal()
+``` 
+  
+Data scientist was the employment title most utilized by survey respondents, followed by data analyst.
+```{r}
+df15<- df  %>% select(
+  "Q15_1",	"Q15_2",	"Q15_3",	"Q15_4",	"Q15_5",	"Q15_6",	"Q15_7",	"Q15_8","Q15_9",	"Q15_10",	"Q15_11",	"Q15_12",	"Q15_13",	"Q15_14",	"Q15_15")
+
+
+dfq15 <- df15 %>%
+  pivot_longer(
+    cols=everything(),
+    names_to="Question_15",
+    values_to="Visualizations",
+    values_drop_na=TRUE
+  )
+
+
+dfq15 %>%
+  ggplot(aes(x=fct_rev(fct_infreq(Visualizations))))+
+  geom_bar()+
+  coord_flip()+
+  theme_minimal()
+```  
+    
+    
+Matplotlib was the visualization library most utilized by survey respondents,
+followed by seaborn.
+```{r}
+
+df36<- df  %>% select(  
+   "Q36_1",	"Q36_2",	"Q36_3",	"Q36_4",	"Q36_5",	"Q36_6",	"Q36_7"
+  ,"Q36_8",	"Q36_9",	"Q36_10",	"Q36_11",	"Q36_12",	"Q36_13",	"Q36_14",	"Q36_15")
+
+dfq36 <- df36 %>%
+  pivot_longer(
+    cols=everything(),
+    names_to="Question_36",
+    values_to="BI_Tools",
+    values_drop_na=TRUE
+  )
+
+
+dfq36 %>%
+  ggplot(aes(x=fct_rev(fct_infreq(BI_Tools))))+
+  geom_bar()+
+  coord_flip()+
+  theme_minimal()
+```
+    
+     
+In terms of BI Tools, 'none' was the most answered response, followed by tableau and  
+power-bi.
+```{r}
+#graph_multicolumn_q(df,
+#                    q15_cols,
+#                    'Question 15',
+#                    'Application',
+#                   'Visualization Libraries')
+```
+Below is more code for standardizing the plots for each question in order to   
+automate the workflow.
+```{r}
+graph_cross_analysis <- function(og_df, q_demo, q_list, q_name, val_label, q_text) {
+  q_df <- og_df %>%
+    select(all_of(c(q_demo, q_list)))
+  
+  q_df1 <- q_df %>%
+    pivot_longer(
+      cols= -1,
+      names_to=q_name,
+      values_to=val_label,
+      values_drop_na=TRUE
+  )
+  
+  q_df2 <- q_df1[complete.cases(q_df1), ]
+  
+  q_df2 %>%
+    ggplot(aes(x=fct_rev(fct_infreq(!!sym(val_label))), fill = as.factor(!!sym(q_demo))))+
+    facet_wrap(q_demo)+
+    coord_flip()+
+    geom_bar()+
+    theme(axis.text.x = element_text(size = 7))+
+    theme(axis.text.y = element_text(size = 6))+
+    theme(legend.position = "none")+
+    labs(y= "Count", x = val_label)+
+    ggtitle(q_text)
+    
+}
+```
+### Part 3: Plots
+Below I plotted the questions I was responsible for:    
+
+1. Utilization of visualization libraries vs years of experience.    
+Below, matplotlib is the most utilized visual library for each 'years of experience' category.
+```{r}
+graph_cross_analysis(og_df = df, 
+                     q_demo = 'Q11', 
+                     q_list = q15_cols, 
+                     q_name = 'Question 15', 
+                     val_label = 'Library',
+                     q_text = 'Utilization of visualization libraries vs years of experience')
+```
+
+
+   
+2. Utilization of BI tools vs years of experience         
+Below, tableau and power-bi are the most utilized BI tools for respondents with less than 3 years
+experience.  After three years of experience, however, 'none' was the choice most frequently documented.
+Although 'none' was the most frequently choose response for respondants with more than three years
+experience in the field, a fair number of people still utilized tableau and power-bi in each experience
+category.
+```{r}
+graph_cross_analysis(og_df = df, 
+                     q_demo = 'Q11', 
+                     q_list = q36_cols, 
+                     q_name = 'Question 36', 
+                     val_label = 'BI Tool',
+                     q_text = 'Utilization of BI tools vs years of experience')
+```
+    
+3. Utilization of visualization libraries vs employment title     
+Among respondants who identified as data scientists, Matplot lib was the most frequent response
+documented.
+```{r}
+ds1<-graph_cross_analysis(og_df = df, 
+                     q_demo = 'Q23', 
+                     q_list = q15_cols, 
+                     q_name = 'Question 15', 
+                     val_label = 'Library',
+                     q_text = 'Visualization Library'
+                     )
+ds1
+```
+    
+4. Utilization of BI tools vs employment title     
+Respondents who identify as data scientists were the profession which most utilized tableau and power-bi in the survey.
+```{r}
+ds2<-graph_cross_analysis(og_df = df, 
+                     q_demo = 'Q23', 
+                     q_list = q36_cols, 
+                     q_name = 'Question 36', 
+                     val_label = 'BI Tool',
+                     
+                     q_text = 'Utilization of BI tools vs employment title')
+ds2
+```
+    
+5. Utilization of BI tools vs salary
+```{r}
+graph_cross_analysis(og_df = df, 
+                     q_demo = 'Q29_grouped', 
+                     q_list = q36_cols, 
+                     q_name = 'Question 36', 
+                     val_label = 'BI Tool',
+                     
+                     q_text = 'Utilization of BI tools vs salary')
+```      
+      
+6. Utilization of visualization libraries vs salary
+```{r}
+graph_cross_analysis(og_df = df, 
+                     q_demo = 'Q29_grouped', 
+                     q_list = q36_cols, 
+                     q_name = 'Question 15', 
+                     val_label = 'Library',
+                     
+                     q_text = 'Utilization of visualization libraries vs salary')
+```
+    
+    
+### Part 3: Discussion
+After each team member completed the above analysis for their assigned questions,
+the team met to decide which findings to include in the presentation.  As the presentation time 
+frame is set at five minutes, it was recommended to concentrate on results which directly tied to
+the employment title 'data science', as it is possible that some of the survey
+participants did not work in 'data science' or related field.  
+Although salary and years of experience are important, we wanted to directly answer
+the question which skills are most valuable to people who consider themselves data
+scientists.  The answer to this question, I was responsable for the two below slides
+which were in my visualization bucket(these are also present and commented in my work above).
+```{r}
+ds1
+ds2
+```
+     
+### Part 4: Conclusion/ Takeaways
+Although I am pleased with our analysis, if I were to collaborate again on a similar
+topic, I would reinforce the importance of the main ask, 'Which are the most valued
+data science skills?' at every stage of the process.  Some of our side analysis, ie
+salary information and years of experience, although relevant, introduced added
+complexity to the project and prevented us from answering the main question in a more
+timely fashion. 
+
