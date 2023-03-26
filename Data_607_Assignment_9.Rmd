@@ -1,0 +1,200 @@
+---
+title: "DATA 607 Assignment Week 9"
+author: "Gregg Maloy"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+```{r load packages, include=FALSE}
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(httr)
+library("ggplot2")
+library("stringr")
+library(jsonlite)
+library(mice)
+library(kableExtra)
+```
+### Part 1: Introduction
+The New York Times web site provides a rich set of APIs,    
+as described here: https://developer.nytimes.com/apis    
+You’ll need to start by signing up for an API key.  Your task is   
+to choose one of the New York Times APIs, construct an interface    
+in R to read in the JSON data, and transform it into an R DataFrame.    
+
+For this assignment I wanted to use the nytimes API to:    
+1. Trend by year how many times the word 'autism' appeared in the nytimes articles     
+since it was first published.    
+2. Determine when the word 'autism' became more frequently used.
+
+\newpage
+### Part 2: Connecting to API and Retrieve and Tidy Data
+Since the nytimes started publication, the word autism has been mentioned in 
+4432 articles.
+
+```{r}
+api_key       <- "gxwgXId5xA73ugWGSiR2A0BAWebVq0bo"
+key_word      <- "autism" 
+Autism_search <- paste0("http://api.nytimes.com/svc/search/v2/articlesearch.json?q=",key_word,"&api-key=",api_key)     
+Content       <- fromJSON(Autism_search) 
+Content$response$meta$hits    
+```
+I initially attempted to include all 4,432 articles in my analysis but     
+the API threw an error at 200 responses.  I then decided to limit     
+my search to the last 10 years.    
+
+In recent years autism has been diagnosed with greater    
+frequency.  The increased diagnosis rate is thought related to     
+changes in the diagnosis criteria, as well as a more educated public.    
+I wanted to pinpoint the year(s) when the term autism started to    
+to be used with a similar frequency as it is used today. In the     
+time period 01/01/2013-12/31/2022, autism appeared in 1920    
+articles.
+
+```{r}
+api_key       <- "gxwgXId5xA73ugWGSiR2A0BAWebVq0bo"
+key_word      <- "autism" 
+begin_date    <- "20130101" 
+end_date      <- "20221231" 
+Autism_search_2000 <- paste0("http://api.nytimes.com/svc/search/v2/articlesearch.json?q=",key_word,"&begin_date=",begin_date,"&end_date=",end_date,"&facet_filter=true&api-key=",api_key , sep="")
+Content_2000  <- fromJSON(Autism_search_2000) 
+Content_2000 $response$meta$hits        
+```
+The below code determine 191 API requests would be needed to pull all 1920
+articles.  
+```{r}
+PageNumber <- round((Content_2000$response$meta$hits[1] / 10)-1) 
+PageNumber
+#PageNumber<-100
+```
+Below a loop is utilized to pull the information on all 1920 articles since nytimes.com limits API returns to ten returns per page.
+```{r}
+data <- list()# empty df
+
+for(i in 0:PageNumber 
+){ 
+  # extract the data and flatten it with json 
+  jsonautismfile <- fromJSON(paste0(Autism_search_2000, "&page=", i), flatten = TRUE) %>% data.frame() 
+  # message("Processing page ", i)
+  # Store data in empty data set 
+  data[[i+1]] <- jsonautismfile
+  # sleeps for 6 seconds 
+  Sys.sleep(6) 
+}
+
+All_Autism_Search <- rbind_pages(data) #place into dataframe
+
+#include only relevant columns
+df2 <- subset(All_Autism_Search,select=c('response.docs.section_name','response.docs.pub_date'))
+
+#new variable creation
+df2[, "year"]  <- format(as.Date(df2$response.docs.pub_date), format = "%Y")
+
+#new variable creation
+df3 <- df2%>% mutate(count =1)
+#df subset
+df4<-df3 %>% subset(select=c(3,4))
+```
+
+### Part 3: Analysis
+In the timeframe 01/01/2013-12/31/2022, the word autism was used with    
+fairly consistent annual frequency, as evident by the below line graph.
+```{r}
+df5<-df4 %>%
+   dplyr::group_by(year) %>%
+   dplyr::summarise(
+           Number_of_Articles=sum(count)
+          )
+
+ggplot(data=df5, aes(x=year, y=Number_of_Articles, group=1, label=Number_of_Articles))+
+  geom_line(color="blue")+
+  geom_point()+
+  geom_text(nudge_y = 10)
+
+data.table(df5)
+```
+Since the word autism was mentioned at a fairly consistent frequency     
+within the past decade, I decided to change my timeframe to    
+determine when the word autism started to be used with its current    
+frequency.
+
+In the time period 01/01/1850-12/31/2009, the word autism was utilized     
+in 1864 articles.
+```{r}
+api_key       <- "gxwgXId5xA73ugWGSiR2A0BAWebVq0bo"
+key_word      <- "autism" 
+#print        <- "1"
+#section_name <-"front+page"
+#print_section<-"("A", "1")"
+begin_date2    <- "18500101" 
+end_date2      <- "20091231" 
+Autism_search_v2000 <- paste0("http://api.nytimes.com/svc/search/v2/articlesearch.json?q=",key_word,"&begin_date=",begin_date2,"&end_date=",end_date2,
+                  #"&print_page:",print,
+                  #"&section_name=",section_name,
+                  #"&print_section:",print_section,
+                  "&facet_filter=true&api-key=",api_key , sep="")
+Content_v2000       <- fromJSON(Autism_search_v2000) 
+Content_v2000 $response$meta$hit
+```
+The API would need to be called 185 seperate times.
+```{r}
+PageNumber2 <- round((Content_v2000$response$meta$hits[1] / 10)-1) 
+PageNumber2
+#PageNumber<-100
+```
+
+```{r}
+data2 <- list()# empty df
+
+for(i in 0:PageNumber2 
+){ 
+  # extract the data and flatten it with json 
+  jsonautismfile2 <- fromJSON(paste0(Autism_search_v2000, "&page=", i), flatten = TRUE) %>% data.frame() 
+  # message("Processing page ", i)
+  # Store data in empty data set 
+  data2[[i+1]] <- jsonautismfile2
+  # sleeps for 6 seconds 
+  Sys.sleep(6) 
+}
+
+All_Autism_Search2 <- rbind_pages(data2) #place into dataframe
+
+#include only relevant columns
+dfz <- subset(All_Autism_Search2,select=c('response.docs.section_name','response.docs.pub_date'))
+
+#new variable creation
+dfz[, "year"]  <- format(as.Date(dfz$response.docs.pub_date), format = "%Y")
+
+#new variable creation
+dfx <- dfz%>% mutate(count =1)
+#df subset
+dfw<-dfx %>% subset(select=c(3,4))
+```
+As evident in the below plot, the use of the word 'autism' in nytimes articles became 
+much more popular in the early to mid 2000's.
+```{r}
+dfv<-dfw %>%
+   dplyr::group_by(year) %>%
+   dplyr::summarise(
+           Number_of_Articles=sum(count)
+          )
+dfv %>%
+ggplot(aes(x=year, y=Number_of_Articles, group=1, label=Number_of_Articles))+
+  geom_line(color="blue")+
+  geom_point()+
+  geom_text(nudge_y = 10, size=2)+ 
+  theme(axis.text.x = element_text(angle = 90))+ 
+  #theme(axis.text = element_text(size = 5))
+  theme(text = element_text(size = 6)) 
+data.table(dfv)
+
+
+#geom_text(aes(label=Percent_Ontime), vjust=-0.3, size=3.5) +
+```
+
+```
+\newpage
+### Part 5: Conclusion
+Scapping API's ia powerful tool.  This work could serve as the starting point for an analysis on the term autism in popular media.
