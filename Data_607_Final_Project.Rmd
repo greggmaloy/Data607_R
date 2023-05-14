@@ -1,0 +1,503 @@
+---
+title: 'DATA 607 Final Project: SMS Classification System Using TidyModels'
+author: "Gregg Maloy"
+output:
+  html_document:
+    df_print: paged
+    code_folding: hide
+---
+#
+
+## {.tabset}
+### Part 1: Assignment 
+For this project, tidymodels was utilized to build a SMS classification system which flagged text messages as 'spam' or 'ham'.  Naive bayes, random forest and XGBoost models were then run to compare classification results across models. 
+
+\newpage    
+### Part 2: Packages & Dataset
+The dataset used for this project is located at:
+https://www.kaggle.com/datasets/uciml/sms-spam-collection-dataset.
+The dataset consists of 5,572 SMS messages/rows and five columns. 
+```{r, message = FALSE, warning=FALSE}
+library(tidyverse)
+library(tidymodels, quietly = T)
+library(tidytext, quietly = T)
+library(stopwords, quietly = T)
+library(janitor, quietly = T)
+library(wordcloud, quietly = T)
+library(tm, quietly = T)
+library(caret, quietly = T)
+library(textrecipes, quietly = T)
+library(discrim, quietly = T)
+library(naivebayes, quietly = T)
+library(wordcloud, quietly = T)
+spam_or_ham =read.csv("https://raw.githubusercontent.com/greggmaloy/Data607_R/main/spam.csv")
+glimpse(spam_or_ham)
+```
+\newpage    
+### Part 3: Data Inspection & Tidying
+Of the 5,572 SMS messages, 4825 (87%) were ham and 747(13%) were spam. Two of the five columns contained
+data.  The columns which do not contain data were deleted and remaining columns renamed:    
+1.) 'spam_or_ham' - a flag which denotes whether a SMS message is spam or ham   
+2.) 'text' -the full text of the SMS message
+
+**Spam vs ham breakdown in original dataset**
+```{r}
+df<- spam_or_ham
+df<- df %>% rename(spam_or_ham=1, text=2)%>% select(1:2)
+
+#df<- df %>% 
+#  mutate(target=case_when(
+#    spam_or_ham=="spam"~as.factor("1"),
+#    spam_or_ham=="ham"~as.factor("0")
+#  ))
+
+df<- df %>% 
+  mutate(flag=case_when(
+    spam_or_ham=="spam"|spam_or_ham=="ham"~as.numeric("1"),
+  ))
+
+spam_or_ham_agg<-count(df, spam_or_ham)
+spam_or_ham_agg
+```
+
+**Occurance of Numbers in the Body of the SMS Messages**  
+The occurrence of numbers is more common in spam messages. See Chart I below.  Of the 4825 ham
+messages, 4077(84%) did not have a number present in the message.  Of the 747 spam messages,
+39(5%) did not have a number present in the message.
+```{r, warning=FALSE, message=FALSE}
+spam_wc<-df%>%
+  filter(spam_or_ham=="spam")
+
+ham_wc<-df%>%
+  filter(spam_or_ham=="ham")
+
+#spam word cloud prep length of messages
+Sys.setlocale( 'LC_ALL','C' ) 
+
+sms_messages_spam_length <- spam_wc %>%
+  mutate(num_characters = nchar(text)) %>%
+  mutate(num_numbers = str_count(text, '\\d+')) %>%
+  mutate(mean = mean(num_characters))%>%
+  mutate(median=median(num_characters))
+
+sms_messages_ham_length <- ham_wc %>%
+  mutate(num_characters = nchar(text))%>%
+  mutate(num_numbers = str_count(text, '\\d+')) %>%
+  mutate(mean = mean(num_characters))%>%
+  mutate(median=median(num_characters))
+
+length_spam_and_ham<-rbind(sms_messages_ham_length,sms_messages_spam_length)
+
+ggplot(length_spam_and_ham, aes(x=num_numbers, fill=spam_or_ham)) +
+    geom_bar( alpha=.5, position="identity")+
+    labs(title="Chart I. Frequency of Numbers in SMS Messages",
+        x ="Frequency of Numbers", y = "Number of SMS Messages", fill="") 
+```
+   
+**Table 1. Frequency of Numbers**
+```{r, warning=FALSE, message=FALSE}
+Table_2<-length_spam_and_ham %>%
+  group_by(spam_or_ham,num_numbers)%>%
+  summarise(freq = n(), .groups = 'drop')%>%
+  pivot_wider(names_from = num_numbers, values_from = freq)
+
+Table_2
+```
+**Number of Characters in SMS messages**   
+SMS message character length was also calculated. See chart 2 below.  A majority of ham messages
+had a character length of less than 100, while a majority of spam messages had a character length
+of more than 100.
+```{r}
+length_spam_and_ham<-rbind(sms_messages_ham_length,sms_messages_spam_length)
+ggplot(length_spam_and_ham, aes(x=num_characters, fill=spam_or_ham)) +
+    geom_bar( alpha=.5, position="identity")+
+    labs(title="Chart 2. Number of characters in SMS Messages",
+        x ="Number of Characters", y = "Number of SMS Messages", fill="")
+```
+   
+**Table 2. Number of characters** 
+```{r, warning=FALSE, message=FALSE}
+Table_4<-length_spam_and_ham %>%
+  group_by(spam_or_ham,num_characters)%>%
+  summarise(freq = n(), .groups = 'drop')%>%
+  pivot_wider(names_from = num_characters, values_from = freq)
+Table_4
+``` 
+**Initial Wordcloud and Frequency Table**   
+Stop words in all languages were eliminated from the dataset and word frequencies were
+calculated for both spam and ham messages.  Numbers and punctuation were allowed to remain in
+the data for the moment as I was interested in seeing how numbers and punctuation impacted the
+wordclouds.  
+
+**Wordclouds** 
+*spam=left, ham=right*
+```{r}
+
+#prep for word clouds
+stopwords <- stopwords_getlanguages(source = "snowball")
+#stop words for all languages available
+stops <- map_df(stopwords, function(x) get_stopwords(language = x))
+#words from sms spam, remove stop words
+suppressMessages(sms_words_spam <- spam_wc %>%
+  
+  transmute(line = 1:nrow(spam_wc),
+            text = text) %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stops) %>%
+  mutate(word = str_remove(word, "^\\w'")))
+
+
+#Frequencies by grouping by word and group
+tidy_spam <- sms_words_spam %>%
+  group_by(word) %>%
+  summarise(freq = n()) %>%
+  arrange(desc(freq))
+
+
+# Get words from sms ham, remove stop words
+suppressMessages(sms_words_ham <- ham_wc %>%
+  transmute(line = 1:nrow(ham_wc),
+            text = text) %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stops) %>%
+  mutate(word = str_remove(word, "^\\w'")))
+
+
+# Frequencies by grouping by word and group
+tidy_ham <- sms_words_ham %>%
+  group_by(word) %>%
+  summarise(freq = n()) %>%
+  arrange(desc(freq))
+
+par(mfrow=c(1,2))
+wordcloud(tidy_ham$word, tidy_ham$freq, scale=c(2,0.5), max.words=200, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, 'Dark2'))
+
+wordcloud(tidy_spam$word, tidy_spam$freq, scale=c(2,0.5), max.words=200, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, 'Dark2'))
+
+``` 
+   
+**Frequency Table**     
+Below is table which lists the 50 most frequently occurring words/characters which are present in spam and ham messages respectively.
+```{r}
+
+#making a table of fifty most frequently used word
+tidy_ham<-tidy_ham   %>%mutate(tidy_ham  , ID = row_number()) %>% slice_min(ID, n = 50)
+tidy_spam<-tidy_spam %>%mutate(tidy_spam , ID = row_number()) %>% slice_min(ID, n = 50)
+
+pre_freq<-cbind(tidy_ham,tidy_spam)
+
+ 
+colnames(pre_freq)[1] = "Ham Words"
+colnames(pre_freq)[2] = "Ham Word Frequency"
+colnames(pre_freq)[4] = "Spam Word"
+colnames(pre_freq)[5] = "Spam Word Frequency"
+colnames(pre_freq)[3] = "Index Position"
+
+pre_freq_final<-pre_freq%>% select(3,1,2,4,5)
+pre_freq_final
+
+``` 
+\newpage    
+### Part 4: More Wordclouds & Corpus Creation 
+Data was further tidied secondary to corpus creation.  Corpus creation included transformation
+of characters to lowercase, removal of punctuation marks, stem document transformation, and stop words. Additional wordclouds were created for both spam and ham messages. Finally, a term document matrix was created which had 5572 rows and 7800 columns.  
+
+**Word Clouds**     
+*spam=left, ham=right*
+```{r,warning=FALSE}
+sms_corpus = VCorpus(VectorSource(df$text))
+corpus_clean = tm_map(sms_corpus, content_transformer(tolower))#To Lowercase Transformation
+corpus_clean = tm_map(corpus_clean, removePunctuation)#Remove Punctuation Transformation
+corpus_clean = tm_map(corpus_clean, stemDocument)#Stem Document Transformation
+corpus_clean = tm_map(corpus_clean, removeWords, stopwords("en"))#Remove Stop words Transformation
+
+#wordcloud prep
+reverse_sms <- data.frame(text = sapply(corpus_clean, as.character), stringsAsFactors = FALSE, spam_or_ham = as.factor(df$spam_or_ham))
+
+#spam wc
+par(mfrow=c(1,2))
+spam <- subset(reverse_sms, spam_or_ham == "spam")
+wordcloud(spam$text, max.words =75,scale=c(3, .4), colors = brewer.pal(7, "Dark2"), random.order = FALSE)
+
+#ham wc
+ham <- subset(reverse_sms,  spam_or_ham == "ham")
+wordcloud(ham$text , max.words =75,scale=c(2, .2), colors = brewer.pal(7, "Dark2"), random.order = FALSE)
+```
+   
+**Below is a sample of the term document matrix**
+```{r}
+
+#dtm
+sms_dtm <- DocumentTermMatrix(corpus_clean)
+
+suppressWarnings(
+  sms_dtm <- DocumentTermMatrix(sms_corpus, control = list(
+  tolower = TRUE,
+  removeNumbers = TRUE, 
+  removePunctuation = TRUE, 
+  stemming = TRUE, 
+  stopwords = TRUE)))
+
+
+tm::inspect(sms_dtm) 
+```
+### Part 5: Test & Train Partitions
+Next data was separated into test and train partitions to prepare for analysis.
+By default, R splits the data into 75% training and 25% testing partitions.  The larger ratio in the training data provides a larger amount of data to train the model, allowing more data for R to derive patterns. 
+
+**Initial split numbers**
+```{r}
+set.seed(1234)#set seed secondary to randomization of split
+split <-initial_split(reverse_sms, strata=spam_or_ham)
+split
+```
+**Spam/ham break down in training partition**
+```{r}
+sms_train <- training(split)
+spam_or_ham_agg_sms_train<-count(sms_train, spam_or_ham)
+spam_or_ham_agg_sms_train
+```
+**Spam/ham break down in testing partition**
+```{r}
+sms_test <- testing(split)
+spam_or_ham_agg_sms_test<-count(sms_test, spam_or_ham)
+spam_or_ham_agg_sms_test
+```
+
+\newpage    
+### Part 6: Tidy Models & Naive Bayes Fitting the Model
+Tidy models was used to construct and fit a Naive Bayes model.  Both training and testing
+partitions were run in this step as a method of validating that both partitions accurately represented the distribution of spam/ham messages.  The probability in both partitions was both equal to 87% ham and 13% spam after rounding.
+```{r}
+sms_recipe <- recipe(spam_or_ham ~ text, data = sms_train)
+
+sms_recipe <- sms_recipe %>% 
+  step_tokenize(text) %>%
+  step_tokenfilter(text, max_tokens = 10) %>%
+  step_tfidf(text)
+
+sms_wf <-workflow() %>% 
+  add_recipe(sms_recipe)
+
+bayes<- naive_Bayes() %>%
+  set_mode("classification") %>%
+  set_engine("naivebayes")
+
+bayes_fit <- sms_wf %>%
+  add_model(bayes) %>%
+  fit(data = sms_train)
+
+
+bayes_fit_test <- sms_wf %>%
+  add_model(bayes) %>%
+  fit(data = sms_test)
+```
+**Training Partition**
+```{r}
+bayes_fit
+```
+**Test Partition**
+```{r}
+bayes_fit_test
+```
+\newpage    
+### Part 7: Bayes Evaluation
+To further evalulate the model, data from the training partition was resampled into ten different partitions and fit to the models to determine how well the model classified spam versus ham SMS messages in the previous step(part 5).  AOC(82%) and accuracy (89%) were derived and plotted from the resampled data.  The AOC and accuracy are both close to 1 denoting a good model fit.  A confusion matrix was also plotted to allow for inspection of predicted values.
+
+**ROC and Accuracy Table**
+```{r}
+set.seed(1245)
+sms_folds <- vfold_cv(sms_train)
+
+#test<-data.frame(sms_folds)
+#sms_recipe_test <- recipe(spam_or_ham ~ text, data = sms_train)
+
+bayes_wf <- workflow() %>%
+  add_recipe(sms_recipe) %>%
+  add_model(bayes)
+
+bayes_rs <- fit_resamples(bayes_wf, sms_folds,
+  control = control_resamples(save_pred = TRUE))
+
+bayes_rs_metrics     <- collect_metrics(bayes_rs)
+bayes_rs_predictions <- collect_predictions(bayes_rs)
+
+
+bayes_rs_metrics      
+#bayes_rs_predictions
+
+bayes_rs_predictions %>%
+  group_by(id) %>%
+  roc_curve(truth = spam_or_ham, .pred_ham) %>% #######is this code correct?
+  autoplot() +
+  labs(
+    color = NULL,
+    title = "ROC",
+    subtitle = "Resamples shown in a different color"
+  )
+```
+   
+**Confusion Matrix**
+```{r}
+conf_mat_resampled(bayes_rs , tidy = FALSE) %>%
+  autoplot(type = "heatmap")
+
+bayes_final<-
+  bayes_wf %>%
+  last_fit(split) %>%
+  collect_predictions() %>%
+  conf_mat(truth = spam_or_ham, estimate = .pred_class)
+bayes_final
+```    
+
+\newpage     
+
+### Part 8: Random Forest
+Next a random forest was run to determine how a random forest compared to naive bayes.  The random forest was first run on training data (ROC=99.6%, accuracy=97.6%) and subsequently on resampled training data as was done with naive bayes.  The resampled random forest results indicated better model fit than the naive bayes model (Random Forest ROC=90.7%, Accuracy=84.5%; Bayes ROC=82%, Accuracy=89%).  The random forest resampled results are likely more accurate than the non-resampled random forest results.    
+
+**Non-resampled ROC**
+```{r}  
+rf_mod<-                # random forest
+  rand_forest() %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+rf_fit<-rf_mod %>%
+    fit(spam_or_ham ~ ., data = sms_train)
+
+rf_training_pred <- 
+  predict(rf_fit, sms_train) %>% 
+  bind_cols(predict(rf_fit, sms_train, type = "prob")) %>% 
+  # Add the true outcome data back in
+  bind_cols(sms_train %>% 
+              select(spam_or_ham))
+
+rf_training_pred %>%                # training set predictions
+  roc_auc(truth = spam_or_ham, .pred_ham)
+```   
+  
+**Non-resampled Accuracy**
+```{r}
+rf_training_pred %>%                # training set predictions
+  accuracy(truth = spam_or_ham, .pred_class)
+``` 
+  
+**Resampled ROC & Accuracy**
+```{r, warning=FALSE}
+#resample
+rf_cv_folds<- vfold_cv(sms_train, strata = spam_or_ham)#,  v = 5, repeats = 1) 
+#workflow
+rf_wf<-                 
+  workflow() %>%
+  add_recipe(sms_recipe) %>%
+  add_model(rf_mod)
+#fit
+rf_fit_rs<-
+  fit_resamples(
+    rf_wf,
+    rf_cv_folds, 
+    metrics = metric_set(roc_auc, accuracy), 
+    control = control_resamples(save_pred = TRUE)
+  )
+collect_metrics(rf_fit_rs)
+
+
+
+
+
+# resampling model eval
+#rf_rs_metrics     <- collect_metrics(rf_fit_rs)
+rf_rs_predictions <- collect_predictions(rf_fit_rs)
+```   
+
+
+```{r, warning=FALSE}
+rf_rs_predictions %>%
+  group_by(id) %>%
+  roc_curve(truth = spam_or_ham, .pred_ham) %>% #######is this code correct?
+  autoplot() +
+  labs(
+    color = NULL,
+    title = "ROC",
+    subtitle = "Resamples shown in a different color"
+  )
+
+```
+**Confusion Matrix**
+```{r}
+conf_mat_resampled(rf_fit_rs , tidy = FALSE) %>%
+  autoplot(type = "heatmap")
+
+rf_final<-
+  rf_wf %>%
+  last_fit(split) %>%
+  collect_predictions() %>%
+  conf_mat(truth = spam_or_ham, estimate = .pred_class)
+rf_final
+  
+```     
+
+\newpage     
+
+### Part 9: XGBoost
+Next a XGBoost model was run to determine if a XGBoost model was able to better classify spam/ham messages. Again training data was resampled into ten seperate partitions.  Results for the XGBoost resamples were very similar to the random forest model resample results. (XGBoost ROC=90.8, Accuracy=84.3%; Random Forest ROC=90.7%, Accuracy=84.5%; Bayes ROC=82%, Accuracy=89%).  
+
+**Resampled ROC & Accuracy**
+```{r, warning=FALSE}  
+  
+xgb_mod<-                
+  boost_tree() %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+xgb_cv_folds<- vfold_cv(sms_train, strata = spam_or_ham)#,  v = 5, repeats = 1) 
+
+xgb_wf<-                
+  workflow() %>%
+  add_recipe(sms_recipe) %>%
+  add_model(xgb_mod)
+
+xgb_fit<-
+  fit_resamples(
+    xgb_wf,
+    xgb_cv_folds, 
+    metrics = metric_set(roc_auc, accuracy), 
+    control = control_resamples(save_pred = TRUE)
+  )
+collect_metrics(xgb_fit)
+
+
+# resampling model eval
+#rf_rs_metrics     <- collect_metrics(rf_fit_rs)
+xgb_rs_predictions <- collect_predictions(xgb_fit)
+
+
+xgb_rs_predictions %>%
+  group_by(id) %>%
+  roc_curve(truth = spam_or_ham, .pred_ham) %>% #######is this code correct?
+  autoplot() +
+  labs(
+    color = NULL,
+    title = "ROC",
+    subtitle = "Resamples shown in a different color"
+  )
+```
+**Resampled Confusion Matrix**
+```{r}
+conf_mat_resampled(xgb_fit , tidy = FALSE) %>%
+  autoplot(type = "heatmap")
+
+xgb_final<-
+  xgb_wf %>%
+  last_fit(split) %>%
+  collect_predictions() %>%
+  conf_mat(truth = spam_or_ham, estimate = .pred_class)
+
+xgb_final
+
+```  
+
+\newpage     
+
+### Part 10: Conclusion
+Random forest and xgboost classification models performed slightly better than the naive bayes model, as indicated by ROC and accuracy results (XGBoost ROC=90.8, Accuracy=84.3%; Random Forest ROC=90.7%, Accuracy=84.5%; Bayes ROC=82%, Accuracy=89%).  
